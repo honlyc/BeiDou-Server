@@ -21,6 +21,8 @@
 */
 package org.gms.net.server.channel.handlers;
 
+import static org.gms.server.maps.MapObjectType.ITEM;
+
 import org.gms.client.Character;
 import org.gms.client.Client;
 import org.gms.client.inventory.Pet;
@@ -28,8 +30,10 @@ import org.gms.net.AbstractPacketHandler;
 import org.gms.net.packet.InPacket;
 import org.gms.server.maps.MapItem;
 import org.gms.server.maps.MapObject;
+import org.gms.server.maps.MapleMap;
 import org.gms.util.PacketCreator;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -50,7 +54,8 @@ public final class PetLootHandler extends AbstractPacketHandler {
 
         p.skip(13);
         int oid = p.readInt();
-        MapObject ob = chr.getMap().getMapObject(oid);
+        MapleMap map = chr.getMap();
+        MapObject ob = map.getMapObject(oid);
         try {
             MapItem mapitem = (MapItem) ob;
             if (mapitem.getMeso() > 0) {
@@ -81,7 +86,19 @@ public final class PetLootHandler extends AbstractPacketHandler {
                 }
             }
 
-            chr.pickupItem(ob, petIndex);
+            boolean petFullPick = chr.getPetFullPick();
+            if (petFullPick) {
+                List<MapObject> items = map.getMapObjects();
+                for (int i = 0; i < items.size(); i++) {
+                    MapObject obj = items.get(i);
+                    if (ITEM.equals(obj.getType())) {
+//                        chr.pickupItem(map.getMapObject(obj.getObjectId()), petIndex);
+                        chr.pickupItemWithoutSelfDrop(map.getMapObject(obj.getObjectId()), petIndex);
+                    }
+                }
+            } else {
+                chr.pickupItem(ob, petIndex);
+            }
         } catch (NullPointerException | ClassCastException e) {
             c.sendPacket(PacketCreator.enableActions());
         }
