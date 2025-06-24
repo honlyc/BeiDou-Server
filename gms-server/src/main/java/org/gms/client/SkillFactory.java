@@ -176,6 +176,7 @@ public class SkillFactory {
                 case BlazeWizard.FLAME_GEAR:
                 case NightWalker.SHADOW_WEB:
                 case NightWalker.POISON_BOMB:
+                case NightWalker.FLASH_JUMP:
                 case NightWalker.VAMPIRE:
                 case ChiefBandit.CHAKRA:
                 case Aran.COMBAT_STEP:

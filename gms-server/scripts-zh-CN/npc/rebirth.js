@@ -69,7 +69,7 @@ function action(mode, type, selection) {
         if (selection === 0) job = "Beginner";
         else if (selection === 1) job = "Noblesse";
         else if (selection === 2) job = "Legend";
-        cm.sendYesNo("你确定要转职成为一个" + 职业 + "吗？");
+        cm.sendYesNo("你确定要转职成为一个" + job + "吗？");
     }
     else if (status === 4 && type === 1) {
         cm.getChar().executeRebornAsId(jobId);

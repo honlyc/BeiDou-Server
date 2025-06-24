@@ -48,13 +48,14 @@ function action(mode, type, selection) {
         text += " \r\n\r\n";
         text += "#L0#新人福利#l \t #L1#每日签到#l \t #L2#在线奖励#l\r\n";
         text += "#L3#传送自由#l \t #L4#爆率一览#l\r\n";
-        if (cm.getPlayer().isGM()) {
+        // if (cm.getPlayer().isGM()) {
             text += "\r\n\r\n";
             text += "\t\t\t\t#r=====以下内容仅GM可见=====\r\n";
             text += "#L61#超级传送#l \t #L62#超级商店#l \t #L63#整容集合#l\r\n\r\n";
 			text += "#L64#UI查询#l \t #L65#一键删除道具#l \t #L66#一键刷道具#l\r\n\r\n";
-			text += "#L67#有状态脚本示例#l \t #L68#NextLevel脚本示例#l";
-        }
+			text += "#L67#高级脚本#l \t #L68#转生#l \t #L69#升星#l\r\n\r\n";
+			text += "#L70#快速转职#l \t #L71#装备增幅#l #L72#自选FFN#l";
+        // }
         cm.sendSimple(text);
     } else if (status === 1) {
         doSelect(selection);
@@ -107,7 +108,19 @@ function doSelect(selection) {
             openNpc("Example1")
             break;
         case 68:
-            openNpc("Example2")
+            openNpc("rebirth")
+            break;
+        case 69:
+            openNpc("升星")
+            break;
+        case 70:
+            openNpc("快速转职")
+            break;
+        case 71:
+            openNpc("装备增幅")
+            break;
+        case 72:
+            openNpc("自选法弗纳武器")
             break;
         default:
             cm.sendOk("该功能暂不支持，敬请期待！");
