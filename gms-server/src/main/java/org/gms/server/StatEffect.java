@@ -669,7 +669,6 @@ public class StatEffect {
                     statups.add(new Pair<>(BuffStat.DASH2, ret.x));
                     statups.add(new Pair<>(BuffStat.DASH, ret.y));
                     break;
-                case Corsair.SPEED_INFUSION:
                 case Buccaneer.SPEED_INFUSION:
                 case ThunderBreaker.SPEED_INFUSION:
                     statups.add(new Pair<>(BuffStat.SPEED_INFUSION, x));
@@ -882,24 +881,19 @@ public class StatEffect {
      */
     public void applyPassive(Character applyto, MapObject obj, int attack) {
         if (makeChanceResult()) {
-            switch (sourceid) { // MP eater
-                case FPWizard.MP_EATER:
-                case ILWizard.MP_EATER:
-                case Cleric.MP_EATER:
-                    if (obj == null || obj.getType() != MapObjectType.MONSTER) {
-                        return;
+            if (sourceid == FPWizard.MP_EATER || sourceid == ILWizard.MP_EATER || sourceid == Cleric.MP_EATER) { // MP eater
+                if (obj == null || obj.getType() != MapObjectType.MONSTER) return;
+
+                Monster mob = (Monster) obj; // x is absorb percentage
+                if (!mob.isBoss()) {
+                    int absorbMp = Math.min((int) (mob.getMaxMp() * (getX() / 100.0)), mob.getMp());
+                    if (absorbMp > 0) {
+                        mob.setMp(mob.getMp() - absorbMp);
+                        applyto.addMP(absorbMp);
+                        applyto.sendPacket(PacketCreator.showOwnBuffEffect(sourceid, 1));
+                        applyto.getMap().broadcastMessage(applyto, PacketCreator.showBuffEffect(applyto.getId(), sourceid, 1), false);
                     }
-                    Monster mob = (Monster) obj; // x is absorb percentage
-                    if (!mob.isBoss()) {
-                        int absorbMp = Math.min((int) (mob.getMaxMp() * (getX() / 100.0)), mob.getMp());
-                        if (absorbMp > 0) {
-                            mob.setMp(mob.getMp() - absorbMp);
-                            applyto.addMP(absorbMp);
-                            applyto.sendPacket(PacketCreator.showOwnBuffEffect(sourceid, 1));
-                            applyto.getMap().broadcastMessage(applyto, PacketCreator.showBuffEffect(applyto.getId(), sourceid, 1), false);
-                        }
-                    }
-                    break;
+                }
             }
         }
     }
@@ -1214,7 +1208,17 @@ public class StatEffect {
         }
     }
 
-    private Rectangle calculateBoundingBox(Point posFrom, boolean facingLeft) {
+    /**
+     * 技能是否定义了攻击/作用范围框。
+     */
+    public boolean hasBoundingBox() {
+        return lt != null && rb != null;
+    }
+
+    /**
+     * 根据角色当前位置和朝向，计算技能范围框在地图中的实际矩形。
+     */
+    public Rectangle calculateBoundingBox(Point posFrom, boolean facingLeft) {
         Point mylt;
         Point myrb;
         if (facingLeft) {
@@ -1744,7 +1748,7 @@ public class StatEffect {
     }
 
     private boolean isInfusion() {
-        return skill && (sourceid == Buccaneer.SPEED_INFUSION || sourceid == Corsair.SPEED_INFUSION || sourceid == ThunderBreaker.SPEED_INFUSION);
+        return skill && (sourceid == Buccaneer.SPEED_INFUSION || sourceid == Corsair.HEROS_WILL || sourceid == ThunderBreaker.SPEED_INFUSION);
     }
 
     private boolean isCygnusFA() {

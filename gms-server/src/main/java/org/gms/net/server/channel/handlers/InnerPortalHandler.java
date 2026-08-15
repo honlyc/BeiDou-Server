@@ -21,15 +21,102 @@
 */
 package org.gms.net.server.channel.handlers;
 
+import org.gms.client.Character;
 import org.gms.client.Client;
 import org.gms.net.AbstractPacketHandler;
 import org.gms.net.packet.InPacket;
+import org.gms.server.maps.MapleMap;
+import org.gms.server.maps.Portal;
+
+import java.awt.Point;
 
 /**
  * @author BubblesDev
  */
 public final class InnerPortalHandler extends AbstractPacketHandler {
+    // 玩家需要处在内传送门附近，才认为这是一次有效"树洞/内传送"触发
+    private static final double INNER_PORTAL_TRIGGER_DISTANCE_SQ = 90000.0; // 约 300 像素
+
     @Override
     public final void handlePacket(InPacket p, Client c) {
+        Character player = c.getPlayer();
+        if (!isPlayerReady(player) || p.available() <= 0) {
+            return;
+        }
+
+        String portalName = readPortalNameSafely(p);
+        if (portalName == null || portalName.isEmpty()) {
+            return;
+        }
+
+        Portal sourcePortal = resolveValidSourcePortal(player, portalName);
+        if (sourcePortal == null) {
+            return;
+        }
+
+        Point playerPos = player.getPosition();
+        if (!isPlayerNearPortal(playerPos, sourcePortal)) {
+            return;
+        }
+
+        // 内传送仅处理"同图传送"；跨图传送交给常规换图流程
+        if (!isSameMapInnerTeleport(player, sourcePortal)) {
+            return;
+        }
+
+        Portal targetPortal = resolveValidTargetPortal(player, sourcePortal);
+        if (targetPortal == null) {
+            return;
+        }
+
+        Point afterPos = new Point(targetPortal.getPosition());
+
+        // 记录传送前玩家坐标，供宠物拾取反作弊旧位置物品补偿使用
+        player.setPetLootTeleportBeforePos(new Point(playerPos));
+
+        movePlayerInMap(player, afterPos);
+        player.markTeleportLikeMove(new Point(playerPos), afterPos);
+    }
+
+    private static boolean isPlayerReady(Character player) {
+        return player != null && player.getMap() != null;
+    }
+
+    private static String readPortalNameSafely(InPacket p) {
+        try {
+            p.readByte(); // 跳过开头标志字节后再读门名
+            return p.readString();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static Portal resolveValidSourcePortal(Character player, String portalName) {
+        Portal sourcePortal = player.getMap().getPortal(portalName);
+        if (sourcePortal == null || sourcePortal.getType() != Portal.TELEPORT_PORTAL) {
+            return null;
+        }
+        return sourcePortal;
+    }
+
+    private static boolean isPlayerNearPortal(Point playerPos, Portal portal) {
+        return playerPos != null && portal.getPosition().distanceSq(playerPos) <= INNER_PORTAL_TRIGGER_DISTANCE_SQ;
+    }
+
+    private static boolean isSameMapInnerTeleport(Character player, Portal sourcePortal) {
+        return sourcePortal.getTargetMapId() == player.getMapId();
+    }
+
+    private static Portal resolveValidTargetPortal(Character player, Portal sourcePortal) {
+        Portal targetPortal = player.getMap().getPortal(sourcePortal.getTarget());
+        if (targetPortal == null || targetPortal.getPosition() == null) {
+            return null;
+        }
+        return targetPortal;
+    }
+
+    private static void movePlayerInMap(Character player, Point afterPos) {
+        MapleMap map = player.getMap();
+        map.movePlayer(player, afterPos);
     }
 }

@@ -68,6 +68,10 @@ function clearStage(stage, eim, curMap) {
 }
 
 function rectangleStages(eim, property, areaCombos, areaRects) {
+    const GameConfig = Java.type('org.gms.config.GameConfig');
+    if(GameConfig.getServerBoolean("use_enable_stage_skip") && eim.getPlayerCount() == 1){
+        return true;
+    }
     var c = eim.getProperty(property);
     if (c == null) {
         c = Math.floor(Math.random() * areaCombos.length);
@@ -135,6 +139,12 @@ function action(mode, type, selection) {
                     cm.sendNext("太棒了！你通过了所有的关卡来到了这一点。这是为了你出色的表现而给予的小奖品。在接受之前，请确保你的使用和其他物品栏有空位可用。");
                 }
             } else if (curMap == 103000800) {   // stage 1
+                const GameConfig = Java.type('org.gms.config.GameConfig');
+                if (eim.getPlayerCount() == 1 && !GameConfig.getServerBoolean("use_enable_stage_skip")) {
+                    cm.sendOk("这里的机关需要多人配合才能解开，一个人恐怕难以应付。等你找到了可靠的伙伴，再一起回来挑战吧！");
+                    cm.dispose();
+                    return;
+                }
                 if (cm.isEventLeader()) {
                     var numpasses = eim.getPlayerCount() - 1;     // minus leader
 
@@ -198,7 +208,7 @@ function action(mode, type, selection) {
                 }
 
                 cm.dispose();
-            } else if (curMap == 103000802) {
+            } else if (curMap == 103000802) {   // stage 3
                 var stgProperty = "stg3Property";
                 var stgCombos = stage3Combos;
                 var stgAreas = stage3Rects;
@@ -224,7 +234,7 @@ function action(mode, type, selection) {
                 }
 
                 cm.dispose();
-            } else if (curMap == 103000803) {
+            } else if (curMap == 103000803) {   // stage 4
                 var stgProperty = "stg4Property";
                 var stgCombos = stage4Combos;
                 var stgAreas = stage4Rects;
@@ -250,7 +260,7 @@ function action(mode, type, selection) {
                 }
 
                 cm.dispose();
-            } else if (curMap == 103000804) {
+            } else if (curMap == 103000804) {   // stage 5
                 if (eim.isEventLeader(cm.getPlayer())) {
                     if (cm.haveItem(4001008, 10)) {
                         cm.sendNext("这是通往最后的奖励阶段的传送门。这个阶段让你更容易地击败普通怪物。你将有一定的时间来尽可能多地狩猎，但你可以随时通过NPC中途离开这个阶段。再次恭喜你通过了所有的阶段。让你的队伍跟我对话，他们可以通过到达奖励阶段来领取奖品。保重……");

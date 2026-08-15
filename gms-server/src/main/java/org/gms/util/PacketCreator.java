@@ -57,6 +57,7 @@ import org.gms.constants.id.ItemId;
 import org.gms.constants.id.MapId;
 import org.gms.constants.id.NpcId;
 import org.gms.constants.inventory.ItemConstants;
+import org.gms.constants.string.CharsetConstants;
 import org.gms.constants.skills.Buccaneer;
 import org.gms.constants.skills.Corsair;
 import org.gms.constants.skills.ThunderBreaker;
@@ -1975,9 +1976,9 @@ public class PacketCreator {
         p.writeShort(0);//chr.getFh()
         p.writeByte(0);
         Pet[] pet = chr.getPets();
-        for (int i = 0; i < 3; i++) {
+        for (byte i = 0; i < 3; i++) {
             if (pet[i] != null) {
-                addPetInfo(p, pet[i], false);
+                addPetInfo(p, pet[i], false, chr.hasPetNameTag(i), chr.hasPetChatballoon(i));
             }
         }
         p.writeByte(0); //end of pets
@@ -2729,18 +2730,18 @@ public class PacketCreator {
         p.writeString(allianceName);  // does not seem to work
         p.writeByte(0); // pMedalInfo, thanks to Arnah (Vertisy)
 
+        // CUIUserInfo::SetMultiPetInfo
         Pet[] pets = chr.getPets();
-        Item inv = chr.getInventory(InventoryType.EQUIPPED).getItem((short) -114);
-        for (int i = 0; i < 3; i++) {
+        for (byte i = 0; i < 3; i++) {
             if (pets[i] != null) {
-                p.writeByte(pets[i].getUniqueId());
+                p.writeBool(true);
                 p.writeInt(pets[i].getItemId()); // petid
                 p.writeString(pets[i].getName());
                 p.writeByte(pets[i].getLevel()); // pet level
                 p.writeShort(pets[i].getTameness()); // pet tameness
                 p.writeByte(pets[i].getFullness()); // pet fullness
                 p.writeShort(0);
-                p.writeInt(inv != null ? inv.getItemId() : 0);
+                p.writeInt(chr.getPetEquipItemId(i));
             }
         }
         p.writeByte(0); //end of pets
@@ -4129,7 +4130,7 @@ public class PacketCreator {
         p.writeByte(0xf0);
         p.writeByte(0x01);
         p.writeInt(0x0f);
-        p.writeFixedString("Default Group");
+        p.writeFixedString(GameConstants.DEFAULT_BUDDY_GROUP);
         p.writeByte(0);
         p.writeInt(chrId);
         return p;
@@ -4422,7 +4423,7 @@ public class PacketCreator {
         return p;
     }
 
-    private static void addPetInfo(final OutPacket p, Pet pet, boolean showpet) {
+    private static void addPetInfo(final OutPacket p, Pet pet, boolean showpet, boolean hasNameTag, boolean hasChatBalloon) {
         p.writeByte(1);
         if (showpet) {
             p.writeByte(0);
@@ -4433,18 +4434,21 @@ public class PacketCreator {
         p.writeLong(pet.getUniqueId());
         p.writePos(pet.getPos());
         p.writeByte(pet.getStance());
-        p.writeInt(pet.getFh());
+        p.writeShort(pet.getFh());
+        p.writeBool(hasNameTag);
+        p.writeBool(hasChatBalloon);
     }
 
     public static Packet showPet(Character chr, Pet pet, boolean remove, boolean hunger) {
+        byte petIndex = chr.getPetIndex(pet);
         OutPacket p = OutPacket.create(SendOpcode.SPAWN_PET);
         p.writeInt(chr.getId());
-        p.writeByte(chr.getPetIndex(pet));
+        p.writeByte(petIndex);
         if (remove) {
             p.writeByte(0);
             p.writeBool(hunger);
         } else {
-            addPetInfo(p, pet, true);
+            addPetInfo(p, pet, true, chr.hasPetNameTag(petIndex), chr.hasPetChatballoon(petIndex));
         }
         return p;
     }
@@ -4458,24 +4462,32 @@ public class PacketCreator {
         return p;
     }
 
-    public static Packet petChat(int cid, byte index, int act, String text) {
+    public static Packet petChat(int cid, byte index, int act, String text, boolean hasChatBalloon) {
         final OutPacket p = OutPacket.create(SendOpcode.PET_CHAT);
         p.writeInt(cid);
         p.writeByte(index);
         p.writeByte(0);
         p.writeByte(act);
         p.writeString(text);
-        p.writeByte(0);
+        p.writeBool(hasChatBalloon);
         return p;
     }
 
-    public static Packet petFoodResponse(int cid, byte index, boolean success, boolean balloonType) {
+    public static Packet petFoodResponse(int cid, byte index, boolean success, boolean hasChatBalloon) {
         final OutPacket p = OutPacket.create(SendOpcode.PET_COMMAND);
         p.writeInt(cid);
         p.writeByte(index);
         p.writeByte(1);
         p.writeBool(success);
-        p.writeBool(balloonType);
+        p.writeBool(hasChatBalloon);
+        return p;
+    }
+
+    public static Packet petEatCashFoodFail() {
+        // CWvsContext::OnCashPetFoodResult
+        OutPacket p = OutPacket.create(SendOpcode.CASH_PET_FOOD_RESULT);
+        p.writeBool(true);
+        // SP_3793_YOUR_PET_CANNOT_CONSUME_THIS_FOOD_R_NPLEASE_CHECK_AGAIN
         return p;
     }
 
@@ -4507,12 +4519,12 @@ public class PacketCreator {
         return p;
     }
 
-    public static Packet changePetName(Character chr, String newname, int slot) {
+    public static Packet changePetName(Character chr, String newname, byte slot) {
         OutPacket p = OutPacket.create(SendOpcode.PET_NAMECHANGE);
         p.writeInt(chr.getId());
-        p.writeByte(0);
+        p.writeByte(slot);
         p.writeString(newname);
-        p.writeByte(0);
+        p.writeBool(chr.hasPetNameTag(slot));
         return p;
     }
 
@@ -5403,7 +5415,7 @@ public class PacketCreator {
 
     public static Packet givePirateBuff(List<Pair<BuffStat, Integer>> statups, int buffid, int duration) {
         OutPacket p = OutPacket.create(SendOpcode.GIVE_BUFF);
-        boolean infusion = buffid == Buccaneer.SPEED_INFUSION || buffid == ThunderBreaker.SPEED_INFUSION || buffid == Corsair.SPEED_INFUSION;
+        boolean infusion = buffid == Buccaneer.SPEED_INFUSION || buffid == ThunderBreaker.SPEED_INFUSION || buffid == Corsair.HEROS_WILL;
         writeLongMask(p, statups);
         p.writeShort(0);
         for (Pair<BuffStat, Integer> stat : statups) {
@@ -5418,7 +5430,7 @@ public class PacketCreator {
 
     public static Packet giveForeignPirateBuff(int cid, int buffid, int time, List<Pair<BuffStat, Integer>> statups) {
         OutPacket p = OutPacket.create(SendOpcode.GIVE_FOREIGN_BUFF);
-        boolean infusion = buffid == Buccaneer.SPEED_INFUSION || buffid == ThunderBreaker.SPEED_INFUSION || buffid == Corsair.SPEED_INFUSION;
+        boolean infusion = buffid == Buccaneer.SPEED_INFUSION || buffid == ThunderBreaker.SPEED_INFUSION || buffid == Corsair.HEROS_WILL;
         p.writeInt(cid);
         writeLongMask(p, statups);
         p.writeShort(0);
@@ -6546,20 +6558,13 @@ public class PacketCreator {
             for (DueyPackage dp : packages) {
                 p.writeInt(dp.getPackageId());
                 p.writeFixedString(dp.getSender());
-                for (int i = dp.getSender().length(); i < 13; i++) {
-                    p.writeByte(0);
-                }
-
                 p.writeInt(dp.getMesos());
                 p.writeLong(getTime(dp.sentTimeInMilliseconds()));
 
                 String msg = dp.getMessage();
                 if (msg != null) {
                     p.writeInt(1);
-                    p.writeFixedString(msg);
-                    for (int i = msg.length(); i < 200; i++) {
-                        p.writeByte(0);
-                    }
+                    p.writeFixedString(msg, 200);
                 } else {
                     p.writeInt(0);
                     p.skip(200);
@@ -6963,7 +6968,7 @@ public class PacketCreator {
         }
         p.writeFixedString(StringUtil.getRightPaddedStr(item.getGiftFrom(), '\0', 13));
         if (isGift) {
-            p.writeFixedString(StringUtil.getRightPaddedStr(giftMessage, '\0', 73));
+            p.writeFixedString(giftMessage, 73);
             return;
         }
         addExpirationTime(p, item.getExpiration());
@@ -7070,11 +7075,14 @@ public class PacketCreator {
 
     public static Packet showCashInventory(Client c) {
         final OutPacket p = OutPacket.create(SendOpcode.CASHSHOP_OPERATION);
+        List<Item> inventory = c.getPlayer().getCashShop().getInventory();
+        int itemCount = Math.min(inventory.size(), CashShop.MAX_CASH_INVENTORY_SAFE);
 
         p.writeByte(0x4B);
-        p.writeShort(c.getPlayer().getCashShop().getInventory().size());
+        p.writeShort(itemCount);
 
-        for (Item item : c.getPlayer().getCashShop().getInventory()) {
+        for (int i = 0; i < itemCount; i++) {
+            Item item = inventory.get(i);
             addCashItemInformation(p, item, c.getAccID());
         }
 
@@ -7430,7 +7438,13 @@ public class PacketCreator {
         scriptableNpcIds.forEach((id, name) -> {
             p.writeInt(id);
             // The client needs a name for the npc conversation, which is displayed under etc when the npc has a quest available.
-            p.writeString(name);
+            if (CharsetConstants.isZhCN()) {
+                byte[] bytes = name.getBytes(CharsetConstants.getCharset(3));
+                p.writeShort(bytes.length);
+                p.writeBytes(bytes);
+            } else {
+                p.writeString(name);
+            }
             p.writeInt(0); // start time
             p.writeInt(Integer.MAX_VALUE); // end time
         });
@@ -7512,7 +7526,12 @@ public class PacketCreator {
         return p;
     }
 
-    public static Packet updateHpMpAlert(byte hp, byte mp) {
+
+    /**
+     * 客户端系统设置回显（目前仅 HP/MP 警报阈值）。
+     * 后续如需扩展系统设置字段，可在该包尾部追加，保持前两个字节为 HP/MP 警报。
+     */
+    public static Packet updateClientSettings(byte hp, byte mp) {
         OutPacket p = OutPacket.create(SendOpcode.UPDATE_HPMPAALERT);
         p.writeByte(hp);
         p.writeByte(mp);
